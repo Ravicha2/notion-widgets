@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>multi-column IN</title>
+<style>
+:root{color-scheme:light dark;--bg:#fff;--fg:#1f2328;--mut:#6b7280;--line:#d0d5dc;--cell:#f3f4f6;--cur:#fde68a;--curb:#f59e0b;--hit:#d1fae5;--hitb:#10b981;--miss:#fee2e2;--missb:#ef4444;--code:#f6f8fa;--hl:#fff3c4}
+@media(prefers-color-scheme:dark){:root{--bg:#191919;--fg:#e8e8e8;--mut:#9ca3af;--line:#3b3b3b;--cell:#262626;--cur:#5a4310;--curb:#fbbf24;--hit:#064e3b;--hitb:#34d399;--miss:#5b1a1a;--missb:#f87171;--code:#202020;--hl:#4a3b10}}
+*{box-sizing:border-box}
+body{margin:0;padding:14px;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+h1{font-size:15px;margin:0 0 8px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;overflow-x:auto}
+.plbl{font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--mut);margin:0 0 4px;text-transform:uppercase}
+table{border-collapse:collapse;font-size:11px;width:100%;font-variant-numeric:tabular-nums}
+th,td{border:1px solid var(--line);padding:3px 6px;text-align:left;white-space:nowrap;transition:background .2s,opacity .2s}
+th{color:var(--mut);font-weight:600;background:var(--cell)}
+tr.done td{opacity:.35}
+tr.cur td{background:var(--cur);box-shadow:inset 0 0 0 1px var(--curb)}
+tr.hit td{background:var(--hit);box-shadow:inset 0 0 0 1px var(--hitb)}
+tr.miss td{background:var(--miss);box-shadow:inset 0 0 0 1px var(--missb)}
+.res{margin-top:10px}
+.ctl{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:8px 0}
+button,select{font:inherit;color:inherit;background:var(--cell);border:1px solid var(--line);border-radius:6px;padding:4px 10px}
+button{cursor:pointer}button:hover:not(:disabled){border-color:var(--mut)}button:disabled{opacity:.45;cursor:default}
+.cnt{color:var(--mut);font-size:12px;margin-left:auto}
+.code{background:var(--code);border:1px solid var(--line);border-radius:8px;padding:6px 0;overflow-x:auto;font:12.5px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;margin-top:8px}
+.code div{padding:0 12px;white-space:pre}.code div.on{background:var(--hl)}
+</style></head><body>
+<h1>multi-column IN</h1>
+<div class='grid'>
+<div><div class='plbl'>e = employees</div><table id='te'></table></div>
+<div><div class='plbl'>subquery result</div><table id='ts'></table></div>
+</div>
+<div class='res'><div class='plbl'>result</div><table id='tr'></table></div>
+<div class='ctl'><button id='prev'>&#9664;</button><button id='play'>&#9654;</button><button id='next'>&#9654;</button><button id='reset'>Reset</button><select id='spd'><option value='1400'>Slow</option><option value='900' selected>Normal</option><option value='450'>Fast</option></select><span class='cnt' id='cnt'></span></div>
+<div class='code' id='code'></div>
+<script>
+var L=['SELECT employee_id, department_id, salary','FROM employees','WHERE (department_id, salary) IN (','    SELECT department_id, MAX(salary)','    FROM employees','    GROUP BY department_id','];'];
+var emp=[[1,10,75000],[2,10,90000],[3,20,85000],[4,20,70000],[5,30,60000]];
+var pairs=[[10,90000],[20,85000],[30,60000]];
+var pairKey={};pairs.forEach(function(p){pairKey[p[0]+'-'+p[1]]=true});
+function hasPair(r){return !!pairKey[r[1]+'-'+r[2]]}
+var steps=[{e:null,stage:'init',l:[0,1,2]},{e:null,stage:'pairs',l:[3,4,5]}];
+emp.forEach(function(_,i){steps.push({e:i,stage:'scan',l:[2]})});
+steps.push({e:emp.length,stage:'done',l:[0]});
+var at=0,timer=null;
+var $=function(id){return document.getElementById(id)};
+function fill(id,head,rows,rowCls){
+var t=$(id);t.innerHTML='';
+var tr=document.createElement('tr');head.forEach(function(h){var th=document.createElement('th');th.textContent=h;tr.appendChild(th)});t.appendChild(tr);
+rows.forEach(function(r,i){var x=document.createElement('tr');x.id=id+'-'+i;x.className=rowCls?rowCls(i):'';r.forEach(function(v){var td=document.createElement('td');td.textContent=v===null?'NULL':v;x.appendChild(td)});t.appendChild(x)})}
+function render(){var s=steps[at],i;
+var checked=s.e===null?0:s.e;
+fill('te',['id','dept','salary','pair'],emp.map(function(r){return [r[0],r[1],r[2],'('+r[1]+', '+r[2]+')']}),function(i){
+if(i<checked)return 'done';
+if(i===s.e)return hasPair(emp[i])?'cur':'miss';
+return ''});
+var showPairs=s.stage==='pairs'||s.stage==='scan'||s.stage==='done';
+fill('ts',['dept','max_salary','pair'],showPairs?pairs.map(function(p){return [p[0],p[1],'('+p[0]+', '+p[1]+')']}):[],function(i){
+if(s.stage==='scan'&&s.e!==null&&emp[s.e][1]===pairs[i][0]&&emp[s.e][2]===pairs[i][1])return 'hit';
+return ''});
+var out=emp.slice(0,checked).filter(hasPair);
+fill('tr',['id','dept','salary'],out);
+$('cnt').textContent=(at+1)+' / '+steps.length;
+var ls=$('code').children;for(var j=0;j<ls.length;j++)ls[j].className=s.l.indexOf(j)>=0?'on':'';
+$('prev').disabled=at===0;$('next').disabled=at===steps.length-1;
+if(at===steps.length-1)stop()}
+function stop(){if(timer){clearInterval(timer);timer=null}$('play').innerHTML='&#9654;'}
+function play(){if(at===steps.length-1){at=0;render()}stop();timer=setInterval(function(){if(at<steps.length-1){at++;render()}else{stop()}},+$('spd').value);$('play').innerHTML='&#10074;&#10074;'}
+$('play').onclick=function(){if(timer){stop()}else{play()}};
+$('next').onclick=function(){stop();if(at<steps.length-1){at++;render()}};
+$('prev').onclick=function(){stop();if(at>0){at--;render()}};
+$('reset').onclick=function(){stop();at=0;render()};
+$('spd').onchange=function(){if(timer)play()};
+L.forEach(function(t){var d=document.createElement('div');d.textContent=t;$('code').appendChild(d)});
+render();
+</script></body></html>
