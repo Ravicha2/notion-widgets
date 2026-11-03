@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>WHERE &#8594; GROUP BY &#8594; HAVING</title>
+<style>
+:root{color-scheme:light dark;--bg:#fff;--fg:#1f2328;--mut:#6b7280;--line:#d0d5dc;--cell:#f3f4f6;--code:#f6f8fa;--hl:#fff3c4}
+@media(prefers-color-scheme:dark){:root{--bg:#191919;--fg:#e8e8e8;--mut:#9ca3af;--line:#3b3b3b;--cell:#262626;--code:#202020;--hl:#4a3b10}}
+*{box-sizing:border-box}
+body{margin:0;padding:14px;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+h1{font-size:15px;margin:0 0 8px;font-weight:600}
+.stage{position:relative;height:244px;overflow-x:auto}
+.r,.b{position:absolute;top:0;left:0;width:150px;height:24px;display:flex;align-items:center;gap:6px;padding:0 8px;border:1px solid var(--line);border-left:3px solid var(--c,#94a3b8);border-radius:6px;background:var(--cell);font-size:12.5px}
+.anim .r,.anim .b{transition:transform .45s ease,opacity .3s}
+.b{left:170px;justify-content:space-between;font-weight:600;background:var(--code)}
+.r .id{color:var(--mut);font-size:11px;min-width:16px}
+.r .rg{flex:1}
+.r .am,.b .v{font-weight:600;font-variant-numeric:tabular-nums}
+.r.dropped .am{text-decoration:line-through;color:var(--mut)}
+.c0{--c:#3b82f6}.c1{--c:#f59e0b}.c2{--c:#8b5cf6}
+.ctl{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:8px 0}
+button,select,input{font:inherit;color:inherit;background:var(--cell);border:1px solid var(--line);border-radius:6px;padding:4px 10px}
+button{cursor:pointer}button:hover:not(:disabled){border-color:var(--mut)}button:disabled{opacity:.45;cursor:default}
+input[type=number]{width:74px;padding:4px 6px}
+.cnt{color:var(--mut);font-size:12px;margin-left:auto}
+.err{color:#dc2626;font-size:12px}
+.code{background:var(--code);border:1px solid var(--line);border-radius:8px;padding:6px 0;overflow-x:auto;font:12.5px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.code div{padding:0 12px;white-space:pre}.code div.on{background:var(--hl)}
+</style></head><body>
+<h1>WHERE &#8594; GROUP BY &#8594; HAVING</h1>
+<div class="stage" id="stage"><div id="rows"></div><div id="badges"></div></div>
+<div class="ctl"><button id="prev">&#9664;</button><button id="play">&#9654;</button><button id="next">&#9654;</button><button id="reset">Reset</button><select id="spd"><option value="1600">Slow</option><option value="1000" selected>Normal</option><option value="500">Fast</option></select><span class="cnt" id="cnt"></span></div>
+<div class="ctl"><span style="color:var(--mut);font-size:12px">WHERE amount &#8805;</span><input id="wt" type="number" value="100" min="0" max="9999" aria-label="WHERE threshold"><span style="color:var(--mut);font-size:12px">HAVING SUM &gt;</span><input id="ht" type="number" value="300" min="0" max="99999" aria-label="HAVING threshold"><button id="apply">Apply</button><span class="err" id="err"></span></div>
+<div class="code" id="code"></div>
+<script>
+var DATA=[["West",200],["East",150],["West",180],["East",50],["North",120],["East",400],["North",100],["West",120]];
+var CARD=24,GAPX=4,STEP=28;
+var rows=[],groups=[],alive=[],at=0,timer=null,rowEls=[],badgeEls={},regionOrder=[];
+DATA.forEach(function(d,i){rows.push({id:i+1,region:d[0],amount:d[1]});if(regionOrder.indexOf(d[0])<0)regionOrder.push(d[0])});
+var $=function(id){return document.getElementById(id)};
+var LINES=["SELECT region, SUM(amount) AS total","FROM sales","WHERE amount >= 100","GROUP BY region","HAVING SUM(amount) > 300","ORDER BY total DESC;"];
+var HL=[1,2,3,4,0,5];
+
+function compute(wt,ht){
+  var a=new Array(rows.length).fill(false),g=[],map={};
+  rows.forEach(function(r,i){if(r.amount>=wt){a[i]=true;if(!map[r.region]){map[r.region]={region:r.region,sum:0,idx:[],pass:false};g.push(map[r.region])}map[r.region].sum+=r.amount;map[r.region].idx.push(i)}});
+  g.forEach(function(x){x.pass=x.sum>ht});
+  return {alive:a,groups:g};
+}
+
+function layout(step){
+  var pos=[],bp={};
+  if(step<2){
+    rows.forEach(function(r,i){pos[i]={x:0,y:i*STEP,o:(step===1&&!alive[i])?0.15:1}});
+  }else{
+    var y=0;
+    groups.forEach(function(g){
+      var top=y;
+      g.idx.forEach(function(ri){pos[ri]={x:0,y:y,o:(step===2?1:(g.pass?1:0.15))};y+=STEP});
+      y+=GAPX*2;
+      bp[g.region]={x:170,y:top+((g.idx.length-1)*STEP)/2,o:1,sum:g.sum};
+    });
+    rows.forEach(function(r,i){if(!pos[i])pos[i]={x:0,y:0,o:0}});
+    if(step>=3){groups.forEach(function(g){if(!g.pass)bp[g.region].o=0.15})}
+    if(step>=4){
+      rows.forEach(function(r,i){pos[i].o=0});
+      var vis=groups.filter(function(g){return g.pass});
+      if(step===5)vis=vis.slice().sort(function(a,b){return b.sum-a.sum});
+      groups.forEach(function(g){bp[g.region].o=0});
+      vis.forEach(function(g,n){bp[g.region]={x:0,y:n*STEP,o:1,sum:g.sum}});
+    }
+  }
+  return {pos:pos,bp:bp};
+}
+
+function build(wt,ht){
+  var c=compute(wt,ht);
+  alive=c.alive;groups=c.groups;
+  var rb=$("rows"),bb=$("badges");
+  rb.innerHTML="";bb.innerHTML="";rowEls=[];badgeEls={};
+  rows.forEach(function(r,i){
+    var d=document.createElement("div"),ci=regionOrder.indexOf(r.region);
+    d.className="r c"+(ci%3);
+    d.innerHTML="<span class='id'>#"+r.id+"</span><span class='rg'>"+r.region+"</span><span class='am'>"+r.amount+"</span>";
+    rb.appendChild(d);rowEls.push(d);
+  });
+  groups.forEach(function(g){
+    var d=document.createElement("div"),ci=regionOrder.indexOf(g.region);
+    d.className="b c"+(ci%3);
+    d.innerHTML="<span class='rg'>"+g.region+"</span><span class='v'>"+g.sum+"</span>";
+    bb.appendChild(d);badgeEls[g.region]=d;
+  });
+  LINES[2]="WHERE amount >= "+wt;
+  LINES[4]="HAVING SUM(amount) > "+ht;
+  paintCode();
+  at=0;stop();render();
+}
+
+function paintCode(){
+  var c=$("code");c.innerHTML="";
+  LINES.forEach(function(t){var d=document.createElement("div");d.textContent=t;c.appendChild(d)});
+}
+
+function render(){
+  var L=layout(at),st=$("stage");
+  rows.forEach(function(r,i){var e=rowEls[i],p=L.pos[i];
+    e.style.transform="translate("+p.x+"px,"+p.y+"px)";e.style.opacity=p.o;
+    e.className="r c"+(regionOrder.indexOf(r.region)%3)+(at===1&&!alive[i]?" dropped":"");
+  });
+  groups.forEach(function(g){var e=badgeEls[g.region],p=L.bp[g.region],ci=regionOrder.indexOf(g.region);
+    if(!p){e.style.opacity=0;return}
+    e.style.transform="translate("+p.x+"px,"+p.y+"px)";e.style.opacity=p.o;
+    e.className="b c"+(ci%3);
+  });
+  var ls=$("code").children;for(var j=0;j<ls.length;j++)ls[j].className=(j===HL[at]?"on":"");
+  $("cnt").textContent=(at+1)+" / 6";
+  $("prev").disabled=at===0;$("next").disabled=at===5;
+  if(at===5)stop();
+}
+
+function stop(){if(timer){clearInterval(timer);timer=null}$("play").innerHTML="&#9654;"}
+function play(){if(at===5){at=0;render()}stop();timer=setInterval(function(){if(at<5){at++;render()}else{stop()}},+$("spd").value);$("play").innerHTML="&#10074;&#10074;"}
+
+$("play").onclick=function(){if(timer)stop();else play()};
+$("next").onclick=function(){stop();if(at<5){at++;render()}};
+$("prev").onclick=function(){stop();if(at>0){at--;render()}};
+$("reset").onclick=function(){stop();at=0;render()};
+$("spd").onchange=function(){if(timer)play()};
+$("apply").onclick=function(){
+  var e=$("err"),wt=+$("wt").value,ht=+$("ht").value;
+  if(!Number.isInteger(wt)||wt<0||wt>9999){e.textContent="WHERE needs an integer 0-9999";return}
+  if(!Number.isInteger(ht)||ht<0||ht>99999){e.textContent="HAVING needs an integer 0-99999";return}
+  var any=rows.some(function(r){return r.amount>=wt});
+  if(!any){e.textContent="No rows pass WHERE";return}
+  e.textContent="";
+  build(wt,ht);
+};
+
+build(100,300);
+requestAnimationFrame(function(){requestAnimationFrame(function(){$("stage").classList.add("anim")})});
+</script></body></html>
