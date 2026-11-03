@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>maxProfit</title>
+<style>
+:root{color-scheme:light dark;--bg:#fff;--fg:#1f2328;--mut:#6b7280;--line:#d0d5dc;--cell:#f3f4f6;--buy:#d1fae5;--buyb:#10b981;--sell:#dbeafe;--sellb:#3b82f6;--cur:#f59e0b;--code:#f6f8fa;--hl:#fff3c4}
+@media(prefers-color-scheme:dark){:root{--bg:#191919;--fg:#e8e8e8;--mut:#9ca3af;--line:#3b3b3b;--cell:#262626;--buy:#064e3b;--buyb:#34d399;--sell:#1e3a5f;--sellb:#60a5fa;--cur:#fbbf24;--code:#202020;--hl:#4a3b10}}
+*{box-sizing:border-box}
+body{margin:0;padding:14px;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+h1{font-size:15px;margin:0 0 8px}
+.stage{overflow-x:auto;padding:2px}
+.chart{display:flex;align-items:flex-end;gap:6px;height:152px;padding-top:4px;min-width:max-content}
+.col{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:32px}
+.val{font-size:10px;color:var(--mut);font-variant-numeric:tabular-nums;margin-bottom:2px}
+.bar{width:22px;border:2px solid var(--line);border-radius:5px 5px 2px 2px;background:var(--cell);transition:height .3s,background .25s,border-color .25s}
+.bar.buy{background:var(--buy);border-color:var(--buyb)}
+.bar.sell{background:var(--sell);border-color:var(--sellb)}
+.bar.cur{box-shadow:0 0 0 2px var(--cur);border-color:var(--cur)}
+.day{font-size:11px;color:var(--mut);margin-top:3px;font-variant-numeric:tabular-nums}
+.tag{font-size:10px;font-weight:600;height:12px;line-height:12px}
+.tag.buy{color:var(--buyb)}.tag.sell{color:var(--sellb)}
+.st{color:var(--mut);font-size:12px}.st b{color:var(--fg);font-variant-numeric:tabular-nums}
+.ctl{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:8px 0}
+button,select,input{font:inherit;color:inherit;background:var(--cell);border:1px solid var(--line);border-radius:6px;padding:4px 10px}
+button{cursor:pointer}button:hover:not(:disabled){border-color:var(--mut)}button:disabled{opacity:.45;cursor:default}
+input{width:230px}.cnt{color:var(--mut);font-size:12px;margin-left:auto}.err{color:#dc2626;font-size:12px}
+.code{background:var(--code);border:1px solid var(--line);border-radius:8px;padding:6px 0;overflow-x:auto;font:12.5px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.code div{padding:0 12px;white-space:pre}.code div.on{background:var(--hl)}
+</style></head><body>
+<h1>maxProfit</h1>
+<div class='stage'><div class='chart' id='chart'></div></div>
+<div class='ctl'><span class='st' id='st'></span></div>
+<div class='ctl'><button id='prev'>&#9664;</button><button id='play'>&#9654;</button><button id='next'>&#9654;</button><button id='reset'>Reset</button><select id='spd'><option value='1400'>Slow</option><option value='900' selected>Normal</option><option value='450'>Fast</option></select><span class='cnt' id='cnt'></span></div>
+<div class='ctl'><input id='inp' value='7,1,5,3,6,4' aria-label='prices, comma separated'><button id='set'>Use</button><span class='err' id='err'></span></div>
+<div class='code' id='code'></div>
+<script>
+var L=['def maxProfit(self, prices: list[int]) -> int:','    buy_price = prices[0]','    profit = 0','    for price in prices[1:]:','        if buy_price > price:','            buy_price = price','        profit = max(price - buy_price, profit)','    return profit'];
+var $=function(id){return document.getElementById(id)},prices=[],steps=[],at=0,timer=null;
+function build(p){var buy=p[0],bi=0,best=0,bs=-1,S=[];
+S.push({i:0,bi:bi,best:best,bs:bs,l:1});
+for(var i=1;i<p.length;i++){
+S.push({i:i,bi:bi,best:best,bs:bs,l:3});
+if(p[i]<buy){buy=p[i];bi=i;S.push({i:i,bi:bi,best:best,bs:bs,l:5});}
+var c=p[i]-buy;
+if(c>best){best=c;bs=i;}
+S.push({i:i,bi:bi,best:best,bs:bs,l:6});}
+S.push({i:null,bi:bi,best:best,bs:bs,l:7});
+return S}
+function setup(p){prices=p;steps=build(p);at=0;stop();var max=Math.max.apply(null,p);var ch=$('chart');ch.innerHTML='';
+p.forEach(function(v,i){var col=document.createElement('div');col.className='col';
+var val=document.createElement('div');val.className='val';val.textContent=v;
+var bar=document.createElement('div');bar.className='bar';bar.style.height=(20+v/max*82)+'px';
+var day=document.createElement('div');day.className='day';day.textContent=i;
+var tag=document.createElement('div');tag.className='tag';tag.id='t'+i;
+col.appendChild(val);col.appendChild(bar);col.appendChild(day);col.appendChild(tag);ch.appendChild(col)});
+render()}
+function render(){var s=steps[at];
+$('chart').childNodes.forEach(function(col,i){
+var bar=col.children[1],cl='bar';
+if(i===s.bi)cl+=' buy';if(i===s.bs)cl+=' sell';if(i===s.i)cl+=' cur';
+bar.className=cl;
+var tag=$('t'+i);tag.className='tag';tag.textContent='';
+if(i===s.bi){tag.textContent='buy';tag.className='tag buy'}
+if(i===s.bs){tag.textContent='sell';tag.className='tag sell'}});
+$('st').innerHTML='buy_price <b>'+(s.bi===undefined?0:prices[s.bi])+'</b> &nbsp;·&nbsp; profit <b>'+s.best+'</b>';
+$('cnt').textContent=(at+1)+' / '+steps.length;
+var ls=$('code').children;for(var j=0;j<ls.length;j++)ls[j].className=j===s.l?'on':'';
+$('prev').disabled=at===0;$('next').disabled=at===steps.length-1;
+if(at===steps.length-1)stop()}
+function stop(){if(timer){clearInterval(timer);timer=null}$('play').innerHTML='&#9654;'}
+function play(){if(at===steps.length-1){at=0;render()}stop();timer=setInterval(function(){if(at<steps.length-1){at++;render()}else{stop()}},+$('spd').value);$('play').innerHTML='&#10074;&#10074;'}
+$('play').onclick=function(){if(timer){stop()}else{play()}};
+$('next').onclick=function(){stop();if(at<steps.length-1){at++;render()}};
+$('prev').onclick=function(){stop();if(at>0){at--;render()}};
+$('reset').onclick=function(){stop();at=0;render()};
+$('spd').onchange=function(){if(timer)play()};
+$('set').onclick=function(){var e=$('err'),p=$('inp').value.split(',').map(function(x){return x.trim()}).filter(Boolean).map(Number);
+if(p.length<2||p.length>16||p.some(function(x){return !Number.isInteger(x)||x<0||x>999})){e.textContent='2 to 16 prices, 0 to 999';return}
+e.textContent='';setup(p)};
+L.forEach(function(t){var d=document.createElement('div');d.textContent=t;$('code').appendChild(d)});
+setup([7,1,5,3,6,4]);
+</script></body></html>

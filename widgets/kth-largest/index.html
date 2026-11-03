@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>KthLargest</title>
+<style>
+:root{color-scheme:light dark;--bg:#fff;--fg:#1f2328;--mut:#6b7280;--line:#d0d5dc;--cell:#f3f4f6;--new:#d1fae5;--newb:#10b981;--bad:#fee2e2;--badb:#ef4444;--root:#dbeafe;--rootb:#3b82f6;--code:#f6f8fa;--hl:#fff3c4}
+@media(prefers-color-scheme:dark){:root{--bg:#191919;--fg:#e8e8e8;--mut:#9ca3af;--line:#3b3b3b;--cell:#262626;--new:#064e3b;--newb:#34d399;--bad:#5b1a1a;--badb:#f87171;--root:#1e3a5f;--rootb:#60a5fa;--code:#202020;--hl:#4a3b10}}
+*{box-sizing:border-box}
+body{margin:0;padding:14px;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+h1{font-size:15px;margin:0 0 8px}
+.stage{overflow-x:auto;padding:2px}
+.lbl{font-size:11px;color:var(--mut);margin:6px 0 4px;letter-spacing:.02em}
+.stream{display:flex;gap:5px}
+.sc{width:34px;height:30px;border:1px dashed var(--line);border-radius:7px;display:flex;align-items:center;justify-content:center;font-weight:600;color:var(--mut);transition:.25s}
+.sc.seen{border-style:solid;color:var(--fg);background:var(--cell)}
+.sc.cur{border-style:solid;border-color:var(--newb);box-shadow:0 0 0 2px var(--newb)}
+.heap{display:flex;gap:5px;align-items:flex-end;min-height:46px}
+.hb{width:40px;height:42px;border:2px solid var(--line);border-radius:8px;background:var(--cell);display:flex;align-items:center;justify-content:center;font-weight:600;font-variant-numeric:tabular-nums;transition:.25s}
+.hb.root{border-color:var(--rootb);background:var(--root)}
+.hb.new{border-color:var(--newb);background:var(--new);animation:pop .35s}
+.hb.bad{border-color:var(--badb);background:var(--bad)}
+.hb.ghost{visibility:hidden}
+@keyframes pop{0%{transform:scale(.7)}60%{transform:scale(1.15)}100%{transform:scale(1)}}
+.ans{font-size:12px;color:var(--mut);margin-top:6px}.ans b{font-size:17px;color:var(--fg);font-variant-numeric:tabular-nums}
+.ctl{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:8px 0}
+button,select,input{font:inherit;color:inherit;background:var(--cell);border:1px solid var(--line);border-radius:6px;padding:4px 10px}
+button{cursor:pointer}button:hover:not(:disabled){border-color:var(--mut)}button:disabled{opacity:.45;cursor:default}
+input{width:150px}input.num{width:52px}.cnt{color:var(--mut);font-size:12px;margin-left:auto}.err{color:#dc2626;font-size:12px}
+.code{background:var(--code);border:1px solid var(--line);border-radius:8px;padding:6px 0;overflow-x:auto;font:12.5px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.code div{padding:0 12px;white-space:pre}.code div.on{background:var(--hl)}
+</style></head><body>
+<h1>KthLargest</h1>
+<div class='stage'>
+<div class='lbl'>add() stream</div><div class='stream' id='stream'></div>
+<div class='lbl'>min-heap (shown sorted) &nbsp;·&nbsp; leftmost = root</div><div class='heap' id='heap'></div>
+<div class='ans'>k = <b id='kk'>3</b> &nbsp; kth largest = <b id='ans'>&mdash;</b></div>
+</div>
+<div class='ctl'><button id='prev'>&#9664;</button><button id='play'>&#9654;</button><button id='next'>&#9654;</button><button id='reset'>Reset</button><select id='spd'><option value='1400'>Slow</option><option value='900' selected>Normal</option><option value='450'>Fast</option></select><span class='cnt' id='cnt'></span></div>
+<div class='ctl'><input id='init' value='4,5,8,2' aria-label='initial nums'><input class='num' id='kin' type='number' min='1' max='10' value='3' aria-label='k'><input id='adds' value='3,5,10,9,4' aria-label='values to add'><button id='set'>Use</button><span class='err' id='err'></span></div>
+<div class='code' id='code'></div>
+<script>
+var L=['import heapq','class KthLargest:','    def __init__(self, k: int, nums: list[int]):','        heapq.heapify(nums)','        self.nums = nums','        self.k = k','        while len(nums) > self.k:','            heapq.heappop(nums)','    def add(self, val: int) -> int:','        heapq.heappush(self.nums, val)','        if len(self.nums) > self.k:','            heapq.heappop(self.nums)','        return self.nums[0]'];
+var $=function(id){return document.getElementById(id)},steps=[],at=0,timer=null,K=3,adds=[];
+function build(init,k,add){var h=init.slice().sort(function(a,b){return a-b});if(h.length>k)h=h.slice(-k);
+var S=[{h:h.slice(),hi:-1,val:null,ans:null,l:6,stream:-1}];
+for(var i=0;i<add.length;i++){var v=add[i],n=h.concat([v]).sort(function(a,b){return a-b});
+S.push({h:n.slice(),hi:n.indexOf(v),val:v,ans:null,l:9,stream:i});
+if(n.length>k){S.push({h:n.slice(),hi:-1,val:v,ans:null,l:11,stream:i,bad:true});n=n.slice(1)}
+h=n;
+S.push({h:h.slice(),hi:-1,val:v,ans:h[0],l:12,stream:i})}
+return S}
+function setup(init,k,add){K=k;adds=add;steps=build(init,k,add);at=0;stop();render()}
+function render(){var s=steps[at],i,el;
+var st=$('stream');st.innerHTML='';adds.forEach(function(v,j){var d=document.createElement('div'),cl='sc';if(s.stream<0||j<s.stream)cl+=' seen';if(j===s.stream)cl+=' cur';d.className=cl;d.textContent=v;st.appendChild(d)});
+var hp=$('heap');hp.innerHTML='';
+for(i=0;i<s.h.length;i++){el=document.createElement('div');var cl='hb';if(i===0)cl+=' root';if(i===s.hi)cl+=' new';if(s.bad&&i===0)cl+=' bad';el.className=cl;el.textContent=s.h[i];hp.appendChild(el)}
+$('kk').textContent=K;$('ans').textContent=s.ans===null?'—':s.ans;
+$('cnt').textContent=(at+1)+' / '+steps.length;
+var ls=$('code').children;for(var j=0;j<ls.length;j++)ls[j].className=j===s.l?'on':'';
+$('prev').disabled=at===0;$('next').disabled=at===steps.length-1;
+if(at===steps.length-1)stop()}
+function stop(){if(timer){clearInterval(timer);timer=null}$('play').innerHTML='&#9654;'}
+function play(){if(at===steps.length-1){at=0;render()}stop();timer=setInterval(function(){if(at<steps.length-1){at++;render()}else{stop()}},+$('spd').value);$('play').innerHTML='&#10074;&#10074;'}
+$('play').onclick=function(){if(timer){stop()}else{play()}};
+$('next').onclick=function(){stop();if(at<steps.length-1){at++;render()}};
+$('prev').onclick=function(){stop();if(at>0){at--;render()}};
+$('reset').onclick=function(){stop();at=0;render()};
+$('spd').onchange=function(){if(timer)play()};
+$('set').onclick=function(){var e=$('err'),p=$('init').value.split(',').map(function(x){return x.trim()}).filter(Boolean).map(Number),a=$('adds').value.split(',').map(function(x){return x.trim()}).filter(Boolean).map(Number),k=+$('kin').value;
+if(p.length>10||a.length>10||!p.length||!a.length){e.textContent='1 to 10 numbers each';return}
+if(p.concat(a).some(function(x){return !Number.isInteger(x)||Math.abs(x)>999})){e.textContent='integers only';return}
+if(!Number.isInteger(k)||k<1||k>p.length+a.length){e.textContent='k must be 1 to number of values';return}
+e.textContent='';setup(p,k,a)};
+L.forEach(function(t){var d=document.createElement('div');d.textContent=t;$('code').appendChild(d)});
+setup([4,5,8,2],3,[3,5,10,9,4]);
+</script></body></html>

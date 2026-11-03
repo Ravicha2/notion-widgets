@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>self join</title>
+<style>
+:root{color-scheme:light dark;--bg:#fff;--fg:#1f2328;--mut:#6b7280;--line:#d0d5dc;--cell:#f3f4f6;--e:#fde68a;--eb:#f59e0b;--m:#d1fae5;--mb:#10b981;--done:#e5e7eb;--code:#f6f8fa;--hl:#fff3c4}
+@media(prefers-color-scheme:dark){:root{--bg:#191919;--fg:#e8e8e8;--mut:#9ca3af;--line:#3b3b3b;--cell:#262626;--e:#5a4310;--eb:#fbbf24;--m:#064e3b;--mb:#34d399;--done:#2a2a2a;--code:#202020;--hl:#4a3b10}}
+*{box-sizing:border-box}
+body{margin:0;padding:14px;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+h1{font-size:15px;margin:0 0 8px}
+.tables{display:grid;grid-template-columns:1fr 1fr;gap:14px;overflow-x:auto}
+.plbl{font-size:12px;font-weight:700;font-family:ui-monospace,Menlo,monospace;color:var(--mut);margin:0 0 4px}
+table{border-collapse:collapse;font-size:11px;width:100%;font-variant-numeric:tabular-nums}
+th,td{border:1px solid var(--line);padding:3px 6px;text-align:left;white-space:nowrap;transition:background .2s,opacity .2s}
+th{color:var(--mut);font-weight:600;background:var(--cell)}
+tr.done td{opacity:.4}
+tr.cur td{background:var(--e);box-shadow:inset 0 0 0 1px var(--eb)}
+tr.match td{background:var(--m);box-shadow:inset 0 0 0 1px var(--mb)}
+.res{margin-top:10px}
+.ctl{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:8px 0}
+button,select{font:inherit;color:inherit;background:var(--cell);border:1px solid var(--line);border-radius:6px;padding:4px 10px}
+button{cursor:pointer}button:hover:not(:disabled){border-color:var(--mut)}button:disabled{opacity:.45;cursor:default}
+.cnt{color:var(--mut);font-size:12px;margin-left:auto}
+.code{background:var(--code);border:1px solid var(--line);border-radius:8px;padding:6px 0;overflow-x:auto;font:12.5px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;margin-top:8px}
+.code div{padding:0 12px;white-space:pre}.code div.on{background:var(--hl)}
+</style></head><body>
+<h1>self join</h1>
+<div class='tables'>
+<div><div class='plbl'>e = employees</div><table id='te'></table></div>
+<div><div class='plbl'>m = employees</div><table id='tm'></table></div>
+</div>
+<div class='res'><div class='plbl'>result</div><table id='tr'></table></div>
+<div class='ctl'><button id='prev'>&#9664;</button><button id='play'>&#9654;</button><button id='next'>&#9654;</button><button id='reset'>Reset</button><select id='spd'><option value='1400'>Slow</option><option value='900' selected>Normal</option><option value='450'>Fast</option></select><span class='cnt' id='cnt'></span></div>
+<div class='code' id='code'></div>
+<script>
+var L=['SELECT e.name AS employee, m.name AS manager','FROM employees e','LEFT JOIN employees m','  ON e.manager_id = m.employee_id;'];
+var emp=[[1,'Alice',null],[2,'Bob',1],[3,'Carol',1],[4,'Dave',2]];
+var steps=[],at=0,timer=null;
+(function(){
+for(var i=0;i<emp.length;i++){
+ steps.push({e:i,m:null,out:i,l:1});
+ var mgr=emp[i][2],mi=null;
+ if(mgr!==null)for(var j=0;j<emp.length;j++)if(emp[j][0]===mgr){mi=j;break}
+ steps.push({e:i,m:mi,out:i,l:3});
+ steps.push({e:i,m:mi,out:i+1,l:0});
+}})();
+var $=function(id){return document.getElementById(id)};
+function fill(id,head,rows){
+var t=$(id);t.innerHTML='';
+var tr=document.createElement('tr');head.forEach(function(h){var th=document.createElement('th');th.textContent=h;tr.appendChild(th)});t.appendChild(tr);
+rows.forEach(function(r,i){var x=document.createElement('tr');x.id=id+'-'+i;r.forEach(function(v){var td=document.createElement('td');td.textContent=v===null?'NULL':v;x.appendChild(td)});t.appendChild(x)})}
+function render(){var s=steps[at];
+fill('te',['id','name','manager_id'],emp);
+fill('tm',['id','name','manager_id'],emp);
+for(var i=0;i<emp.length;i++){
+var re=$('te-'+i),rm=$('tm-'+i);
+re.className=i<s.e?'done':(i===s.e?'cur':'');
+rm.className=i===s.m?'match':'';}
+var out=emp.slice(0,s.out).map(function(r){
+var mgr=r[2]===null?null:emp.filter(function(x){return x[0]===r[2]})[0][1];
+return [r[1],mgr]});
+fill('tr',['employee','manager'],out);
+$('cnt').textContent=(at+1)+' / '+steps.length;
+var ls=$('code').children;for(var j=0;j<ls.length;j++)ls[j].className=j===s.l?'on':'';
+$('prev').disabled=at===0;$('next').disabled=at===steps.length-1;
+if(at===steps.length-1)stop()}
+function stop(){if(timer){clearInterval(timer);timer=null}$('play').innerHTML='&#9654;'}
+function play(){if(at===steps.length-1){at=0;render()}stop();timer=setInterval(function(){if(at<steps.length-1){at++;render()}else{stop()}},+$('spd').value);$('play').innerHTML='&#10074;&#10074;'}
+$('play').onclick=function(){if(timer){stop()}else{play()}};
+$('next').onclick=function(){stop();if(at<steps.length-1){at++;render()}};
+$('prev').onclick=function(){stop();if(at>0){at--;render()}};
+$('reset').onclick=function(){stop();at=0;render()};
+$('spd').onchange=function(){if(timer)play()};
+L.forEach(function(t){var d=document.createElement('div');d.textContent=t;$('code').appendChild(d)});
+render();
+</script></body></html>

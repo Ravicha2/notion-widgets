@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>CTE vs subquery</title>
+<style>
+:root{color-scheme:light dark;--bg:#fff;--fg:#1f2328;--mut:#6b7280;--line:#d0d5dc;--cell:#f3f4f6;--code:#f6f8fa;--hl:#fff3c4;--row:#dbeafe;--keep:#d1fae5;--keepb:#10b981}
+@media(prefers-color-scheme:dark){:root{--bg:#191919;--fg:#e8e8e8;--mut:#9ca3af;--line:#3b3b3b;--cell:#262626;--code:#202020;--hl:#4a3b10;--row:#1e3a5f;--keep:#064e3b;--keepb:#34d399}}
+*{box-sizing:border-box}
+body{margin:0;padding:14px;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+h1{font-size:15px;margin:0 0 8px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.pane{min-width:0}
+.plbl{font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--mut);margin:0 0 4px;text-transform:uppercase}
+.code{background:var(--code);border:1px solid var(--line);border-radius:8px;padding:5px 0;overflow-x:auto;font:11.5px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.code div{padding:0 9px;white-space:pre}.code div.on{background:var(--hl)}
+.tbox{margin-top:8px;overflow-x:auto}
+.tcap{font-size:10.5px;color:var(--mut);font-family:ui-monospace,Menlo,monospace;margin-bottom:3px;white-space:nowrap}
+table{border-collapse:collapse;font-size:11px;font-variant-numeric:tabular-nums;width:100%}
+th,td{border:1px solid var(--line);padding:2px 6px;text-align:left;white-space:nowrap}
+th{color:var(--mut);font-weight:600;background:var(--cell)}
+td.hi{background:var(--keep)}
+.ctl{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:8px 0}
+button,select{font:inherit;color:inherit;background:var(--cell);border:1px solid var(--line);border-radius:6px;padding:4px 10px}
+button{cursor:pointer}button:hover:not(:disabled){border-color:var(--mut)}button:disabled{opacity:.45;cursor:default}
+.cnt{color:var(--mut);font-size:12px;margin-left:auto}
+</style></head><body>
+<h1>CTE vs subquery</h1>
+<div class='ctl'><button id='prev'>&#9664;</button><button id='play'>&#9654;</button><button id='next'>&#9654;</button><button id='reset'>Reset</button><select id='spd'><option value='1400'>Slow</option><option value='900' selected>Normal</option><option value='450'>Fast</option></select><span class='cnt' id='cnt'></span></div>
+<div class='grid'>
+<div class='pane'><div class='plbl'>CTE</div><div class='code' id='codeC'></div><div class='tbox'><div class='tcap' id='capC'></div><table id='tabC'></table></div></div>
+<div class='pane'><div class='plbl'>subquery</div><div class='code' id='codeS'></div><div class='tbox'><div class='tcap' id='capS'></div><table id='tabS'></table></div></div>
+</div>
+<script>
+var C=['WITH HighValueSales AS (','  SELECT salesperson_id, sale_amount','  FROM sales_data','  WHERE sale_amount > 10000',')','SELECT salesperson_id, COUNT(*) AS deals','FROM HighValueSales','GROUP BY salesperson_id;'];
+var S=['SELECT salesperson_id, COUNT(*) AS deals','FROM (','  SELECT salesperson_id, sale_amount','  FROM sales_data','  WHERE sale_amount > 10000',') AS HighValueSales','GROUP BY salesperson_id;'];
+var sales=[[1,12000],[1,8000],[2,15000],[2,20000],[3,9000],[3,11000]];
+var high=sales.filter(function(r){return r[1]>10000});
+var res=[[1,1],[2,2],[3,1]];
+var steps=[
+ {c:[0],s:[0,1],stage:'raw'},
+ {c:[1,2,3],s:[2,3,4],stage:'high'},
+ {c:[4,5,6],s:[5],stage:'high'},
+ {c:[7],s:[6],stage:'result'}];
+var $=function(id){return document.getElementById(id)},at=0,timer=null;
+function tab(id,rows,head){
+var t=$(id);t.innerHTML='';
+var tr=document.createElement('tr');head.forEach(function(h){var th=document.createElement('th');th.textContent=h;tr.appendChild(th)});t.appendChild(tr);
+rows.forEach(function(r){var x=document.createElement('tr');r.forEach(function(v){var td=document.createElement('td');td.textContent=v;x.appendChild(td)});t.appendChild(x)})}
+function render(){var st=steps[at],rows,head;
+if(st.stage==='raw'){rows=sales;head=['salesperson','amount']}
+else if(st.stage==='high'){rows=high;head=['salesperson','amount']}
+else{rows=res;head=['salesperson','deals']}
+tab('tabC',rows,head);tab('tabS',rows,head);
+$('capC').textContent=st.stage==='high'?'HighValueSales':(st.stage==='result'?'result':'sales_data');
+$('capS').textContent=st.stage==='high'?'( ... ) HighValueSales':(st.stage==='result'?'result':'sales_data');
+var lc=$('codeC').children,ls=$('codeS').children,j;
+for(j=0;j<lc.length;j++)lc[j].className=st.c.indexOf(j)>=0?'on':'';
+for(j=0;j<ls.length;j++)ls[j].className=st.s.indexOf(j)>=0?'on':'';
+$('cnt').textContent=(at+1)+' / '+steps.length;
+$('prev').disabled=at===0;$('next').disabled=at===steps.length-1;
+if(at===steps.length-1)stop()}
+function stop(){if(timer){clearInterval(timer);timer=null}$('play').innerHTML='&#9654;'}
+function play(){if(at===steps.length-1){at=0;render()}stop();timer=setInterval(function(){if(at<steps.length-1){at++;render()}else{stop()}},+$('spd').value);$('play').innerHTML='&#10074;&#10074;'}
+$('play').onclick=function(){if(timer){stop()}else{play()}};
+$('next').onclick=function(){stop();if(at<steps.length-1){at++;render()}};
+$('prev').onclick=function(){stop();if(at>0){at--;render()}};
+$('reset').onclick=function(){stop();at=0;render()};
+$('spd').onchange=function(){if(timer)play()};
+C.forEach(function(t){var d=document.createElement('div');d.textContent=t;$('codeC').appendChild(d)});
+S.forEach(function(t){var d=document.createElement('div');d.textContent=t;$('codeS').appendChild(d)});
+render();
+</script></body></html>
