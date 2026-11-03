@@ -51,7 +51,7 @@ S.push({a:a.slice(),left:left,right:null,ck:ck,lg:lg,l:12});
 return S}
 function setup(a,k){nums=a;K=k;steps=build(a,k);at=0;stop();var row=$('row'),idx=$('idx');row.innerHTML='';idx.innerHTML='';cells=[];
 for(var i=0;i<a.length;i++){var c=document.createElement('div');row.appendChild(c);cells.push(c);var s=document.createElement('span');s.textContent=i;idx.appendChild(s)}
-$('track').style.width=(a.length*ST)+'px';render()}
+$('track').style.width=((a.length+1)*ST)+'px';render()}
 function render(){var s=steps[at];
 for(var k=0;k<nums.length;k++){var c=cells[k],cl='cell',inwin=s.right!==null&&k>=s.left&&k<=s.right;
 c.textContent=s.a[k];
