@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>removeDuplicates - two pointers</title>
+<style>
+:root{color-scheme:light dark;--bg:#fff;--fg:#1f2328;--mut:#6b7280;--line:#d0d5dc;--cell:#f3f4f6;--keep:#d1fae5;--keepb:#10b981;--mv:#f59e0b;--rp:#3b82f6;--code:#f6f8fa;--hl:#fff3c4}
+@media(prefers-color-scheme:dark){:root{--bg:#191919;--fg:#e8e8e8;--mut:#9ca3af;--line:#3b3b3b;--cell:#262626;--keep:#064e3b;--keepb:#34d399;--mv:#fbbf24;--rp:#60a5fa;--code:#202020;--hl:#4a3b10}}
+*{box-sizing:border-box}
+body{margin:0;padding:14px;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+h1{font-size:15px;margin:0 0 2px}.sub{color:var(--mut);font-size:12px;margin-bottom:10px}
+.leg{display:flex;gap:12px;flex-wrap:wrap;color:var(--mut);font-size:12px;margin-bottom:6px}.leg b{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+.stage{overflow-x:auto;padding:4px 2px 6px}
+.track{position:relative;height:112px}
+.row{position:absolute;top:34px;left:0;display:flex;gap:5px}
+.cell{width:40px;height:40px;border:2px solid var(--line);border-radius:8px;background:var(--cell);display:flex;align-items:center;justify-content:center;font-weight:600;font-variant-numeric:tabular-nums;transition:background .25s,border-color .25s,opacity .25s}
+.cell.keep{background:var(--keep);border-color:var(--keepb)}
+.cell.cur{border-color:var(--mv);box-shadow:0 0 0 2px var(--mv)}
+.cell.last{box-shadow:0 0 0 2px var(--keepb)}
+.cell.wr{border-color:var(--rp);box-shadow:0 0 0 2px var(--rp);animation:pop .35s}
+.cell.dead{opacity:.3}
+.cell.ghost{visibility:hidden}
+@keyframes pop{0%{transform:scale(.7)}60%{transform:scale(1.15)}100%{transform:scale(1)}}
+.idx{position:absolute;top:78px;left:0;display:flex;gap:5px;color:var(--mut);font-size:11px}.idx span{width:40px;text-align:center}
+.mk{position:absolute;width:40px;display:flex;justify-content:center;white-space:nowrap;font-size:12px;font-weight:600;transition:left .45s ease,opacity .25s}
+.mm{top:8px;color:var(--mv)}.mr{top:94px;color:var(--rp)}
+.msg{min-height:46px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;margin:6px 0 10px}
+.ctl{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px}
+button,select,input{font:inherit;color:inherit;background:var(--cell);border:1px solid var(--line);border-radius:6px;padding:4px 10px}
+button{cursor:pointer}button:hover:not(:disabled){border-color:var(--mut)}button:disabled{opacity:.45;cursor:default}
+input{width:210px}.cnt{color:var(--mut);font-size:12px;margin-left:auto}.err{color:#dc2626;font-size:12px}
+.code{background:var(--code);border:1px solid var(--line);border-radius:8px;padding:6px 0;overflow-x:auto;font:12.5px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.code div{padding:0 12px;white-space:pre}.code div.on{background:var(--hl)}
+</style></head><body>
+<h1>removeDuplicates: two pointers, in place</h1>
+<div class='sub'>move_i scans every element. replace_i marks the next slot to write a new unique value.</div>
+<div class='leg'><span><b style='background:var(--mv)'></b>move_i (reader)</span><span><b style='background:var(--rp)'></b>replace_i (next write slot)</span><span><b style='background:var(--keepb)'></b>kept: nums[0:replace_i]</span></div>
+<div class='stage'><div class='track' id='track'><div class='mk mm' id='mm'>move_i &#9660;</div><div class='row' id='row'></div><div class='idx' id='idx'></div><div class='mk mr' id='mr'>&#9650; replace_i</div></div></div>
+<div class='msg' id='msg'></div>
+<div class='ctl'><button id='prev'>&#9664; Prev</button><button id='play'>&#9654; Play</button><button id='next'>Next &#9654;</button><button id='reset'>Reset</button><select id='spd'><option value='1400'>Slow</option><option value='900' selected>Normal</option><option value='450'>Fast</option></select><span class='cnt' id='cnt'></span></div>
+<div class='ctl'><input id='inp' value='0,0,1,1,1,2,2,3,3,4' aria-label='Sorted array, comma separated'><button id='set'>Use array</button><span class='err' id='err'></span></div>
+<div class='code' id='code'></div>
+<script>
+var L=['def removeDuplicates(self, nums: list[int]) -> int:','    replace_i = 1','    for move_i in range(1, len(nums)):','        if nums[replace_i-1] != nums[move_i]:','            nums[replace_i] = nums[move_i]','            replace_i += 1','    return replace_i'];
+var $=function(id){return document.getElementById(id)},ST=45,nums=[],steps=[],at=0,timer=null,cells=[];
+function build(a){var arr=a.slice(),r=1,S=[];
+S.push({a:arr.slice(),r:r,m:null,k:'init',l:1,t:'nums[0] is always kept, so replace_i starts at 1. Everything before replace_i is the finished, de-duplicated part.'});
+for(var m=1;m<arr.length;m++){var last=arr[r-1],cur=arr[m];
+if(last!==cur){
+S.push({a:arr.slice(),r:r,m:m,k:'cmp',l:3,t:'Compare nums[replace_i-1] = '+last+' with nums[move_i] = '+cur+'. They differ, so '+cur+' is a new value.'});
+arr[r]=cur;
+S.push({a:arr.slice(),r:r,m:m,k:'wr',l:4,w:r,t:'Write '+cur+' into nums['+r+'].'});
+r++;
+S.push({a:arr.slice(),r:r,m:m,k:'adv',l:5,t:'replace_i becomes '+r+'. The kept region grew by one.'});
+}else{
+S.push({a:arr.slice(),r:r,m:m,k:'skip',l:3,t:'Compare nums[replace_i-1] = '+last+' with nums[move_i] = '+cur+'. Same value, so it is a duplicate. Skip it; replace_i stays at '+r+'.'});}}
+S.push({a:arr.slice(),r:r,m:null,k:'done',l:6,t:'Loop finished. return '+r+': the first '+r+' elements ['+arr.slice(0,r).join(', ')+'] are the unique values. Whatever comes after does not matter.'});
+return S}
+function setup(a){nums=a;steps=build(a);at=0;stop();var row=$('row'),idx=$('idx');row.innerHTML='';idx.innerHTML='';cells=[];
+for(var k=0;k<=a.length;k++){var c=document.createElement('div');row.appendChild(c);cells.push(c);var s=document.createElement('span');s.textContent=k<a.length?k:'';idx.appendChild(s)}
+$('track').style.width=((a.length+1)*ST)+'px';render()}
+function render(){var s=steps[at],n=nums.length;
+for(var k=0;k<=n;k++){var c=cells[k],cl='cell';
+if(k===n){cl+=' ghost'}else{
+c.textContent=s.a[k];
+if(k<s.r)cl+=' keep';
+if(s.k==='done'&&k>=s.r)cl+=' dead';
+if(s.m===k)cl+=' cur';
+if((s.k==='cmp'||s.k==='skip')&&k===s.r-1)cl+=' last';
+if(s.k==='wr'&&k===s.w)cl+=' wr';}
+c.className=cl}
+$('mm').style.left=(s.m===null?0:s.m*ST)+'px';$('mm').style.opacity=s.m===null?0:1;
+$('mr').style.left=(s.r*ST)+'px';
+$('msg').textContent=s.t;
+$('cnt').textContent='step '+(at+1)+' / '+steps.length;
+var ls=$('code').children;for(var j=0;j<ls.length;j++)ls[j].className=j===s.l?'on':'';
+$('prev').disabled=at===0;$('next').disabled=at===steps.length-1;
+if(at===steps.length-1)stop()}
+function stop(){if(timer){clearInterval(timer);timer=null}$('play').innerHTML='&#9654; Play'}
+function play(){if(at===steps.length-1){at=0;render()}stop();timer=setInterval(function(){if(at<steps.length-1){at++;render()}else{stop()}},+$('spd').value);$('play').innerHTML='&#10074;&#10074; Pause'}
+$('play').onclick=function(){if(timer){stop()}else{play()}};
+$('next').onclick=function(){stop();if(at<steps.length-1){at++;render()}};
+$('prev').onclick=function(){stop();if(at>0){at--;render()}};
+$('reset').onclick=function(){stop();at=0;render()};
+$('spd').onchange=function(){if(timer)play()};
+$('set').onclick=function(){var e=$('err'),p=$('inp').value.split(',').map(function(x){return x.trim()}).filter(Boolean).map(Number);
+if(!p.length||p.length>14||p.some(function(x){return !Number.isInteger(x)||Math.abs(x)>999})){e.textContent='Enter 1 to 14 integers separated by commas, e.g. 1,1,2';return}
+for(var i=1;i<p.length;i++){if(p[i]<p[i-1]){e.textContent='Array must be sorted (non-decreasing)';return}}
+e.textContent='';setup(p)};
+L.forEach(function(t){var d=document.createElement('div');d.textContent=t;$('code').appendChild(d)});
+setup([0,0,1,1,1,2,2,3,3,4]);
+</script></body></html>
