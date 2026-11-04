@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BOUND / UNBOUND</title>
+<style>
+:root{color-scheme:light dark;--bg:#fff;--fg:#1f2328;--mut:#6b7280;--line:#d0d5dc;--cell:#f3f4f6;--keep:#d1fae5;--keepb:#10b981;--mv:#f59e0b;--code:#f6f8fa;--hl:#fff3c4}
+@media(prefers-color-scheme:dark){:root{--bg:#191919;--fg:#e8e8e8;--mut:#9ca3af;--line:#3b3b3b;--cell:#262626;--keep:#064e3b;--keepb:#34d399;--mv:#fbbf24;--code:#202020;--hl:#4a3b10}}
+*{box-sizing:border-box}
+body{margin:0;padding:14px;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+h1{font-size:15px;margin:0 0 10px;font-weight:600;letter-spacing:.02em}
+.grid{font-variant-numeric:tabular-nums}
+.tr{display:grid;grid-template-columns:34px 76px 62px 66px;gap:0 8px;align-items:center;padding:4px 6px;border:2px solid transparent;border-radius:7px;transition:background .2s,border-color .2s}
+.tr.hd{padding:0 6px 3px;color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+.tr.in{background:var(--keep)}
+.tr.cur{border-color:var(--mv);box-shadow:0 0 0 2px var(--mv)}
+.tr .id,.tr .t{color:var(--mut);font-size:12.5px}
+.tr.tie .t{text-decoration:underline dashed var(--mv);text-underline-offset:3px}
+.tr .sum{font-weight:600;text-align:right}
+.tr .sum.mut{color:var(--mut);font-weight:400}
+.ctl{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:10px 0 0}
+button,select{font:inherit;color:inherit;background:var(--cell);border:1px solid var(--line);border-radius:6px;padding:4px 10px}
+button{cursor:pointer}button:hover:not(:disabled){border-color:var(--mut)}button:disabled{opacity:.45;cursor:default}
+select{max-width:100%}
+.cnt{color:var(--mut);font-size:12px;margin-left:auto;font-variant-numeric:tabular-nums}
+.code{background:var(--code);border:1px solid var(--line);border-radius:8px;padding:6px 0;overflow-x:auto;margin-top:10px;font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.code div{padding:0 12px;white-space:pre}.code div.on{background:var(--hl)}
+</style></head><body>
+<h1>BOUND / UNBOUND</h1>
+<div class="grid" id="grid"></div>
+<div class="ctl">
+  <button id="prev" aria-label="Previous row">&#9664;</button>
+  <button id="play" aria-label="Play">&#9654;</button>
+  <button id="next" aria-label="Next row">&#9654;</button>
+  <button id="reset">Reset</button>
+  <select id="spd" aria-label="Speed"><option value="1400">Slow</option><option value="900" selected>Normal</option><option value="450">Fast</option></select>
+  <span class="cnt" id="cnt"></span>
+</div>
+<div class="ctl">
+  <select id="mode" aria-label="Window frame"></select>
+  <span class="cnt" id="stat"></span>
+</div>
+<div class="code" id="code"></div>
+<script>
+var $=function(id){return document.getElementById(id)};
+var ROWS=[
+  {id:1,t:'09:00',amt:100},
+  {id:2,t:'09:05',amt:50},
+  {id:3,t:'09:05',amt:70},
+  {id:4,t:'09:10',amt:30},
+  {id:5,t:'09:15',amt:20},
+  {id:6,t:'09:20',amt:40}
+];
+var MODES=[
+  {label:'UNBOUNDED PRECEDING → CURRENT ROW',sql:'ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW',ord:'ORDER BY created_at, id',frame:function(i,n){return[0,i]}},
+  {label:'2 PRECEDING → CURRENT ROW',sql:'ROWS BETWEEN 2 PRECEDING AND CURRENT ROW',ord:'ORDER BY created_at, id',frame:function(i,n){return[Math.max(0,i-2),i]}},
+  {label:'UNBOUNDED → UNBOUNDED',sql:'ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING',ord:'ORDER BY created_at, id',frame:function(i,n){return[0,n-1]}},
+  {label:'CURRENT ROW → 1 FOLLOWING',sql:'ROWS BETWEEN CURRENT ROW AND 1 FOLLOWING',ord:'ORDER BY created_at, id',frame:function(i,n){return[i,Math.min(n-1,i+1)]}},
+  {label:'default RANGE (peers included)',sql:'RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW',ord:'ORDER BY created_at',peer:true,frame:function(i,n){var e=i;while(e+1<n&&ROWS[e+1].t===ROWS[i].t)e++;return[0,e]}}
+];
+var at=0,timer=null,rowEls=[],curMode=0;
+
+function frameFor(i){var f=MODES[curMode].frame(i,ROWS.length);return{s:f[0],e:f[1]}}
+function aggregates(){var out=[],m=MODES[curMode];for(var i=0;i<ROWS.length;i++){var f=m.frame(i,ROWS.length),t=0;for(var k=f[0];k<=f[1];k++)t+=ROWS[k].amt;out.push({s:f[0],e:f[1],t:t})}return out}
+
+function buildGrid(){
+  var g=$('grid');g.innerHTML='';rowEls=[];
+  var hd=document.createElement('div');hd.className='tr hd';
+  ['id','created_at','amount','sum'].forEach(function(t){var s=document.createElement('span');s.textContent=t;hd.appendChild(s)});
+  g.appendChild(hd);
+  ROWS.forEach(function(r){
+    var d=document.createElement('div');d.className='tr';
+    [r.id,r.t,r.amt,''].forEach(function(v,k){var s=document.createElement('span');s.className=['id','t','amt','sum'][k];s.textContent=v;d.appendChild(s)});
+    g.appendChild(d);rowEls.push(d);
+  });
+}
+
+function buildCode(){
+  var m=MODES[curMode];
+  var lines=['SELECT id, created_at, amount,','  SUM(amount) OVER (','    PARTITION BY account_id',m.ord,'    '+m.sql,'  ) AS total','FROM tx;'];
+  var c=$('code');c.innerHTML='';
+  lines.forEach(function(t,j){var d=document.createElement('div');d.textContent=t;if(j===4)d.className='on';c.appendChild(d)});
+}
+
+function render(){
+  var cur=frameFor(at),agg=aggregates(),m=MODES[curMode];
+  rowEls.forEach(function(el,k){
+    var cl='tr';
+    if(k>=cur.s&&k<=cur.e)cl+=' in';
+    if(k===at)cl+=' cur';
+    if(m.peer&&ROWS[k].t===ROWS[at].t)cl+=' tie';
+    el.className=cl;
+    var sum=el.children[3];
+    sum.textContent=k<=at?agg[k].t:'';
+    sum.className='sum'+(k===at?'':' mut');
+  });
+  $('stat').textContent='rows '+(cur.s+1)+'–'+(cur.e+1)+' · SUM = '+agg[at].t;
+  $('cnt').textContent=(at+1)+' / '+ROWS.length;
+  $('prev').disabled=at===0;
+  $('next').disabled=at===ROWS.length-1;
+  if(at===ROWS.length-1)stop();
+}
+
+function stop(){if(timer){clearInterval(timer);timer=null}$('play').innerHTML='&#9654;'}
+function play(){if(at===ROWS.length-1){at=0;render()}stop();timer=setInterval(function(){if(at<ROWS.length-1){at++;render()}else{stop()}},+$('spd').value);$('play').innerHTML='&#10074;&#10074;'}
+
+MODES.forEach(function(m,i){var o=document.createElement('option');o.value=i;o.textContent=m.label;$('mode').appendChild(o)});
+$('mode').onchange=function(){stop();curMode=+$('mode').value;at=0;buildCode();render()};
+$('play').onclick=function(){if(timer){stop()}else{play()}};
+$('next').onclick=function(){stop();if(at<ROWS.length-1){at++;render()}};
+$('prev').onclick=function(){stop();if(at>0){at--;render()}};
+$('reset').onclick=function(){stop();at=0;render()};
+$('spd').onchange=function(){if(timer)play()};
+
+buildGrid();buildCode();render();
+</script></body></html>
